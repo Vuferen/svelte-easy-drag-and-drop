@@ -66,7 +66,7 @@ For targeting a specific list, you can add in the wrapper id/class:
 ```
 
 ## Reverse lists
-If the child elements in your list are in reverse order e.g. by using `flex-direction: column-reverse;` or `flex-direction: row-reverse;`, then add a fourth argument set to true:
+If the elements in your list are in reverse order e.g. by using `flex-direction: column-reverse;` or `flex-direction: row-reverse;`, then add a fourth argument set to true:
 ```svelte
 <ul class="wrapper-id">
   {#each draggable(list, ".wrapper-id", () => {list = list}, true) as item (item.id)}
