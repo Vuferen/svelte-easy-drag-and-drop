@@ -14,6 +14,14 @@ let updateFuncListMap: Map<string, number> = new Map();
 let mouse = {x: 0, y: 0};
 
 export function draggable(list: Array<any>, wrapperQuery: string, onUpdate: Function, reverseOrder = false) {
+	if (typeof document !== 'undefined') {
+		isMounted = Promise.resolve(true);
+		document.addEventListener("dragover", (e) => {
+			mouse.x = e.clientX;
+			mouse.y = e.clientY;
+		});
+	}
+
 	isMounted.then(() => {
 		list = handleDraggable(list, wrapperQuery, onUpdate, reverseOrder)
 	});

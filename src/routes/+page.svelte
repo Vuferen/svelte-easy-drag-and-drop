@@ -15,18 +15,18 @@
 		{/each}
 	</ul>
 	{:else}
-	<ul class="wrapper-id">
+	<!-- <ul class="wrapper-id">
 		{#each draggable(list, ".wrapper-id", () => {list = list}) as item, index (item.name)}
 			<li>
 				<span class="text">{item.name}</span>
 				<span class="grab" data-grabbable="true"></span>
 			</li>
 		{/each}
-	</ul>
+	</ul> -->
 	{/if}
 
 	<!-- <button on:click={() => {list2 = [...list2, {name: "test2"}]}}>Add</button> -->
-	<ul class="wrapper-id">
+	<!-- <ul class="wrapper-id">
 		{#each draggable(list2, ".wrapper-id", () => {list2 = list2}) as item, index (item.name)}
 			<li>
 				<span class="text">{item.name}</span> 
@@ -42,7 +42,7 @@
 				<span class="grab" data-grabbable="true"></span>
 			</li>
 		{/each}
-	</ul>
+	</ul> -->
 </div>
 
 <script lang="ts">
