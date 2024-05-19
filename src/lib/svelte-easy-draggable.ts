@@ -13,14 +13,14 @@ let svelteLists: SvelteListMap = new Map();
 let updateFuncListMap: Map<string, number> = new Map();
 let mouse = {x: 0, y: 0};
 
-export function draggable(list: Array<any>, wrapperQuery: string, onUpdate: Function) {
+export function draggable(list: Array<any>, wrapperQuery: string, onUpdate: Function, reverseOrder = false) {
 	isMounted.then(() => {
-		list = handleDraggable(list, wrapperQuery, onUpdate)
+		list = handleDraggable(list, wrapperQuery, onUpdate, reverseOrder)
 	});
 	// Initial load
 	onMount(() => {
 		isMounted = Promise.resolve(true);
-		list = handleDraggable(list, wrapperQuery, onUpdate)
+		list = handleDraggable(list, wrapperQuery, onUpdate, reverseOrder)
 		document.addEventListener("dragover", (e) => {
 			mouse.x = e.clientX;
 			mouse.y = e.clientY;
@@ -29,7 +29,7 @@ export function draggable(list: Array<any>, wrapperQuery: string, onUpdate: Func
 	return list;
 }
 
-function handleDraggable(list: Array<any>, wrapperQuery: string, onUpdate: Function) {
+function handleDraggable(list: Array<any>, wrapperQuery: string, onUpdate: Function, reverseOrder: boolean) {
 	if (svelteLists.get(wrapperQuery) == undefined) {
 		svelteLists.set(wrapperQuery, [{list: list, update: onUpdate}]);
 		updateFuncListMap.set(onUpdate.name, 0);
@@ -65,9 +65,9 @@ function handleDraggable(list: Array<any>, wrapperQuery: string, onUpdate: Funct
 					key.setAttribute("draggable", "true")
 					key.addEventListener("dragstart", (e) => {dragStart(e, value)});
 					key.addEventListener("dragend", (e) => {dragEnd(value); drop(e, list, wrapperQuery, currentIndex, onUpdate)});
-					value.addEventListener("dragover", (e) => {dragOver(e, wrapperQuery)})
+					value.addEventListener("dragover", (e) => {dragOver(e, wrapperQuery, reverseOrder)})
 					value.addEventListener("drop", (e) => drop(e, list, wrapperQuery, currentIndex, onUpdate))
-					value.addEventListener("dragenter", (e) => dragEnter(e, wrapperQuery))
+					value.addEventListener("dragenter", (e) => dragEnter(e, wrapperQuery, reverseOrder))
 					value.addEventListener("dragleave", (e) => dragLeave(e))
 					dragTargets.set(key, {element: value, id: currentIndex, listId: currentListIndex})
 					dropTargets.set(value, {element: key,  id: currentIndex, listId: currentListIndex})
@@ -75,6 +75,13 @@ function handleDraggable(list: Array<any>, wrapperQuery: string, onUpdate: Funct
 			}
 			currentIndex++;
 		})
+		if (!dragList.getAttribute("data-tracked-by-easy-draggable")) {
+			dragList.setAttribute("data-tracked-by-easy-draggable", wrapperQuery)
+			dragList.setAttribute("data-easy-draggable-wrapper", "true")
+			dragList.addEventListener("dragover", (e) => {dragOver(<DragEvent>e, wrapperQuery, reverseOrder)})
+			dragList.addEventListener("drop", (e) => drop(<DragEvent>e, list, wrapperQuery, currentIndex, onUpdate))
+			dragList.addEventListener("dragenter", (e) => dragEnter(<DragEvent>e, wrapperQuery, reverseOrder))
+		}
 		currentListIndex++;
 	})
 	let filteredDroppableLists = new Map()
@@ -131,6 +138,7 @@ let currentlyDragging = false;
 let draggingElementDisplay: string;
 let draggingElement: HTMLElement;
 let elementToPlace: HTMLElement;
+// let elementOriginalOpacity = "1"
 function dragStart(event: DragEvent, element: HTMLElement) {
 	// Have to use timeout because of chrome being chrome
 	if (event.dataTransfer) {
@@ -157,6 +165,7 @@ function dragStart(event: DragEvent, element: HTMLElement) {
 		mouse.y = event.clientY;
 		draggingElement.style.left = element.getBoundingClientRect().x + "px";
 		draggingElement.style.top = element.getBoundingClientRect().y + "px";
+		// draggingElement.style.opacity = svelteEasyDraggableConfig.draggingElementOpacity.toString();
 
 		element.addEventListener("drag", (e: DragEvent) => {
 			let elementBeingDragged = document.getElementById("element-being-dragged");
@@ -164,10 +173,11 @@ function dragStart(event: DragEvent, element: HTMLElement) {
 			elementBeingDragged.style.left = (mouse.x - offsetX) + "px";
 			elementBeingDragged.style.top = (mouse.y - offsetY) + "px";
 		})
-		// element.style.display = "none";
-		element.style.opacity = "0.4";
+		// elementOriginalOpacity = element.style.opacity;
+		// element.style.opacity = svelteEasyDraggableConfig.previewElementOpacity.toString();
+		element.setAttribute("data-preview-element", "true")
+		draggingElement.setAttribute("data-dragging-element", "true")
 		document.body.after(draggingElement);
-		// toggleDraggable(false)
 	}, 0)
 
 }
@@ -179,16 +189,17 @@ function dragEnd(element: HTMLElement) {
 	togglePreventChildInterference(false);
 		draggingElement.remove();
 		// element.style.display = draggingElementDisplay
-		element.style.opacity = "1"
+		// element.style.opacity = elementOriginalOpacity
+		element.removeAttribute("data-preview-element")
 		// toggleDraggable(true)
 	}, 0)
 }
 
 let isPlacedBeforeTarget: HTMLElement | null = null;
 let isPlacedAfterTarget: HTMLElement | null = null;
-let enteredFromAbove = false;
-let enteredFromBelow = false;
-function dragEnter(event: DragEvent, wrapperQuery: string) {
+let enteredFromAbove = false; // currently always false
+let enteredFromBelow = false; // currently always false
+function dragEnter(event: DragEvent, wrapperQuery: string, reverseOrder: boolean) {
 	event.preventDefault()
 	if ((<HTMLElement>event.target).getAttribute("data-tracked-by-easy-draggable") !== elementToPlace.getAttribute("data-tracked-by-easy-draggable")) {
 		if (event.dataTransfer) {
@@ -197,13 +208,17 @@ function dragEnter(event: DragEvent, wrapperQuery: string) {
 		return
 	};
 	setTimeout(() => {
+		if ((<HTMLElement>event.target).getAttribute("data-easy-draggable-wrapper")) {
+			updatePositionAsChild(<HTMLElement>event.target)
+			return
+		}
 
 		let target = <HTMLElement>event.target
 		if (elementToPlace.contains(target)) return;
 
 		const targetRect = target.getBoundingClientRect();
-		const lowerBound = targetRect.top + (targetRect.bottom - targetRect.top) * 0.8;
-		const upperBound = targetRect.top + (targetRect.bottom - targetRect.top) * 0.2;
+		const lowerBound = targetRect.top + (targetRect.bottom - targetRect.top) * 1;
+		const upperBound = targetRect.top + (targetRect.bottom - targetRect.top) * 0;
 		if (mouse.y > lowerBound) {
 			enteredFromBelow = true;
 		} else if (mouse.y < upperBound) {
@@ -212,11 +227,11 @@ function dragEnter(event: DragEvent, wrapperQuery: string) {
 			enteredFromBelow = false;
 			enteredFromAbove = false;
 		}
-		updatePosition(target, lowerBound, upperBound, wrapperQuery, true);
+		updatePosition(target, lowerBound, upperBound, wrapperQuery, true, reverseOrder);
 	}, 0)
 }
 
-function dragOver(event: DragEvent, wrapperQuery: string) {
+function dragOver(event: DragEvent, wrapperQuery: string, reverseOrder: boolean) {
 	event.preventDefault()
 	if ((<HTMLElement>event.target).getAttribute("data-tracked-by-easy-draggable") !== elementToPlace.getAttribute("data-tracked-by-easy-draggable")) {
 		if (event.dataTransfer) {
@@ -225,6 +240,10 @@ function dragOver(event: DragEvent, wrapperQuery: string) {
 		return
 	};
 	setTimeout(() => {
+		if ((<HTMLElement>event.target).getAttribute("data-easy-draggable-wrapper")) {
+			updatePositionAsChild(<HTMLElement>event.target)
+			return
+		}
 
 		let target = <HTMLElement>event.target;
 		if (elementToPlace.contains(target)) return;
@@ -232,12 +251,12 @@ function dragOver(event: DragEvent, wrapperQuery: string) {
 		const targetRect = target.getBoundingClientRect();
 		const lowerBound = targetRect.top + (targetRect.bottom - targetRect.top) * 0.8;
 		const upperBound = targetRect.top + (targetRect.bottom - targetRect.top) * 0.2;
-		updatePosition(target, lowerBound, upperBound, wrapperQuery, false);
+		updatePosition(target, lowerBound, upperBound, wrapperQuery, false, reverseOrder);
 	}, 0)
 }
 
 let extraUpdatesAfterEntering = 0;
-function updatePosition(target: HTMLElement, lowerBound: number, upperBound: number, wrapperQuery: string, isEntering: boolean) {
+function updatePosition(target: HTMLElement, lowerBound: number, upperBound: number, wrapperQuery: string, isEntering: boolean, reverseOrder: boolean) {
 	const isNotPlaced = isPlacedBeforeTarget == null && isPlacedAfterTarget == null;
 
 	let isPlacedSomewhereAfterTarget = false;
@@ -260,37 +279,77 @@ function updatePosition(target: HTMLElement, lowerBound: number, upperBound: num
 		}
 	}
 
-	const shouldPlaceBefore = (enteredFromAbove && mouse.y < upperBound && !isNotPlaced) || 
-							  (enteredFromBelow && mouse.y < lowerBound) || 
-							  (!enteredFromAbove && !enteredFromBelow && isPlacedSomewhereAfterTarget);
-	const shouldPlaceAfter = (enteredFromAbove && mouse.y > upperBound) || 
-							 ((enteredFromBelow) && mouse.y > lowerBound && !isNotPlaced) || 
-							 (!enteredFromAbove && !enteredFromBelow && isPlacedSomewhereBeforeTarget);
+	if (reverseOrder) {
+		let temp = enteredFromAbove;
+		enteredFromAbove = enteredFromBelow;
+		enteredFromBelow = temp;
+	}
+	let shouldPlaceBefore = (enteredFromAbove && mouse.y < upperBound && !isNotPlaced) || 
+							(enteredFromBelow && mouse.y < lowerBound) || 
+							(!enteredFromAbove && !enteredFromBelow && isPlacedSomewhereAfterTarget);
+	let shouldPlaceAfter = (enteredFromAbove && mouse.y > upperBound) || 
+						   ((enteredFromBelow) && mouse.y > lowerBound && !isNotPlaced) || 
+						   (!enteredFromAbove && !enteredFromBelow && isPlacedSomewhereBeforeTarget);
+	shouldPlaceBefore = reverseOrder ? (enteredFromAbove && mouse.y > upperBound && !isNotPlaced) || 
+									   (enteredFromBelow && mouse.y > lowerBound) || 
+									   (!enteredFromAbove && !enteredFromBelow && isPlacedSomewhereAfterTarget) 
+									 : shouldPlaceBefore;
+	shouldPlaceAfter = reverseOrder ? (enteredFromAbove && mouse.y < upperBound) || 
+									  ((enteredFromBelow) && mouse.y < lowerBound && !isNotPlaced) || 
+									  (!enteredFromAbove && !enteredFromBelow && isPlacedSomewhereBeforeTarget) 
+									: shouldPlaceAfter;
 
 	if (shouldPlaceBefore && !isPlacedBeforeTarget?.isSameNode(target)) {
 		removeElement()
 		target.before(elementToPlace);
-		showElement()
 		isPlacedBeforeTarget = target;
 		isPlacedAfterTarget = null;
+		showElement()
 	} else if (shouldPlaceAfter && !isPlacedAfterTarget?.isSameNode(target)) {
 		removeElement()
 		target.after(elementToPlace);
-		showElement()
 		isPlacedBeforeTarget = null;
 		isPlacedAfterTarget = target;
+		showElement()
 	}
+}
+function updatePositionAsChild(target: HTMLElement) {
+	let firstRect = target.firstElementChild?.getBoundingClientRect()
+	let lastRect = target.lastElementChild?.getBoundingClientRect()
+
+	if (!firstRect || !lastRect) {
+		previewAsChild(target)
+	}
+
+	const top = Math.min((<DOMRect>firstRect).top, (<DOMRect>lastRect).top);
+	const bottom = Math.max((<DOMRect>firstRect).bottom, (<DOMRect>lastRect).bottom);
+	const right = Math.max((<DOMRect>firstRect).right, (<DOMRect>lastRect).right);
+	const left = Math.min((<DOMRect>firstRect).left, (<DOMRect>lastRect).left);
+
+	const mouseXOutside = mouse.x > right || mouse.x < left;
+	const mouseYOutside = mouse.y > bottom || mouse.y < top;
+	if (mouseXOutside && mouseYOutside) {
+		previewAsChild(target)
+	}
+}
+
+function previewAsChild(target: HTMLElement) {
+	removeElement()
+	target.appendChild(elementToPlace);
+	showElement()
+	isPlacedBeforeTarget = null;
+	isPlacedAfterTarget = null;
 }
 
 function removeElement() {
 	elementToPlace.remove()
-	draggingElement.style.opacity = "1"
-	elementToPlace.style.opacity = "0.2"
+	// draggingElement.style.opacity = svelteEasyDraggableConfig.draggingElementOpacity.toString()
+	// elementToPlace.style.opacity = svelteEasyDraggableConfig.previewElementOpacity.toString()
 }
 
 function showElement() {
-	draggingElement.style.opacity = "1"
-	elementToPlace.style.opacity = "0.4"
+	// draggingElement.style.opacity = svelteEasyDraggableConfig.draggingElementOpacity.toString()
+	// elementToPlace.style.opacity = svelteEasyDraggableConfig.previewElementOpacity.toString()
 }
 
 function dragLeave(event: DragEvent) {
@@ -356,7 +415,7 @@ function togglePreventChildInterference(shouldPrevent: Boolean) {
 	let preventStyle = document.getElementById("svelteEasyDraggablePreventChildInterference");
 	if (shouldPrevent && preventStyle == null) {
 		const style = `
-			[data-tracked-by-easy-draggable] * {
+			[data-tracked-by-easy-draggable]:not([data-easy-draggable-wrapper]) * {
 				pointer-events: none;
 			}
 		`;
