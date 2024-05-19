@@ -34,6 +34,8 @@ If you only want to be able to grab a specific element, then give it the attribu
   {/each}
 </ul>
 ```
+**Note:** If set on a `<td>` it may not work correctly, unless it is set to `display: block;`.
+
 ## Multiple list
 If you want to drag elements between multiple list, then give them the same wrapper class:
 ```svelte
