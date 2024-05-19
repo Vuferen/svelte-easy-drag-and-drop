@@ -1,58 +1,78 @@
-# create-svelte
+# Svelte easy drag and drop
 
-Everything you need to build a Svelte library, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/master/packages/create-svelte).
+This library provides a single function to make your existing lists draggable.
 
-Read more about creating a library [in the docs](https://kit.svelte.dev/docs/packaging).
-
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
-
-```bash
-# create a new project in the current directory
-npm create svelte@latest
-
-# create a new project in my-app
-npm create svelte@latest my-app
+## Usage
+Wrap your list/array with the `draggable()` function, and provide a query string to target the wrapper as well as a function to make Svelte update the list:
+```svelte
+<ul class="wrapper-id">
+  {#each draggable(list, ".wrapper-id", () => {list = list}) as item (item.id)}
+    <li>
+      {item.name}
+    </li>
+  {/each}
+</ul>
 ```
 
-## Developing
+## Add a handle
+If you only want to be able to grab a specific element, then give it the attribute `data-grabbable="true"`:
+```svelte
+<ul class="wrapper-id">
+  {#each draggable(list, ".wrapper-id", () => {list = list}) as item (item.id)}
+    <li>
+      {item.name}
+      <span data-grabbable="true"></span>
+    </li>
+  {/each}
+</ul>
+```
+## Multiple list
+If you want to drag elements between multiple list, then give them the same wrapper class:
+```svelte
+<ul class="wrapper-id">
+  {#each draggable(list, ".wrapper-id", () => {list = list}) as item (item.id)}
+    <li>
+      {item.name}
+    </li>
+  {/each}
+</ul>
+<ul class="wrapper-id">
+  {#each draggable(list2, ".wrapper-id", () => {list2 = list2}) as item (item.id)}
+    <li>
+      {item.name}
+    </li>
+  {/each}
+</ul>
+```
+If you do not want to be able to drag elements between list, then give each list a unique wrapper id/class.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+## Styling
+When dragging an element, a preview of the placement will be shown as well as the element being dragged by the cursor.
+You can style both of these by targeting them with css:
+```scss
+:global(html [data-preview-element]) {
+  transform: scale(0.9);
+  opacity: 0.4;
+}
+:global(html [data-dragging-element]) {
+  box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.15);
+}
+```
+For targeting a specific list, you can add in the wrapper id/class:
+```scss
+:global(html .wrapper-id [data-preview-element]) {
+  background-color: rgb(206, 210, 212);
+}
 ```
 
-Everything inside `src/lib` is part of your library, everything inside `src/routes` can be used as a showcase or preview app.
-
-## Building
-
-To build your library:
-
-```bash
-npm run package
-```
-
-To create a production version of your showcase app:
-
-```bash
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
-
-## Publishing
-
-Go into the `package.json` and give your package the desired name through the `"name"` option. Also consider adding a `"license"` field and point it to a `LICENSE` file which you can create from a template (one popular option is the [MIT license](https://opensource.org/license/mit/)).
-
-To publish your library to [npm](https://www.npmjs.com):
-
-```bash
-npm publish
+## Reverse lists
+If the child elements in your list are in reverse order e.g. by using `flex-direction: column-reverse;` or `flex-direction: row-reverse;`, then add a fourth argument set to true:
+```svelte
+<ul class="wrapper-id">
+  {#each draggable(list, ".wrapper-id", () => {list = list}, true) as item (item.id)}
+    <li>
+      {item.name}
+    </li>
+  {/each}
+</ul>
 ```
