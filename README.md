@@ -2,6 +2,11 @@
 
 This library provides a single function to make your existing lists draggable.
 
+## Install
+```bash
+npm i @vuferen/svelte-easy-drag-and-drop
+```
+
 ## Usage
 Wrap your list/array with the `draggable()` function, and provide a query string to target the wrapper as well as a function to make Svelte update the list:
 ```js
