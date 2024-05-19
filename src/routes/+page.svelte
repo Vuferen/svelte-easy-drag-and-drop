@@ -15,18 +15,18 @@
 		{/each}
 	</ul>
 	{:else}
-	<!-- <ul class="wrapper-id">
+	<ul class="wrapper-id">
 		{#each draggable(list, ".wrapper-id", () => {list = list}) as item, index (item.name)}
 			<li>
 				<span class="text">{item.name}</span>
 				<span class="grab" data-grabbable="true"></span>
 			</li>
 		{/each}
-	</ul> -->
+	</ul>
 	{/if}
 
 	<!-- <button on:click={() => {list2 = [...list2, {name: "test2"}]}}>Add</button> -->
-	<!-- <ul class="wrapper-id">
+	<ul class="wrapper-id">
 		{#each draggable(list2, ".wrapper-id", () => {list2 = list2}) as item, index (item.name)}
 			<li>
 				<span class="text">{item.name}</span> 
@@ -35,7 +35,7 @@
 		{/each}
 	</ul>
 
-	<ul class="wrapper-id-2">
+	<!-- <ul class="wrapper-id-2">
 		{#each draggable(list3, ".wrapper-id-2", () => {list3 = list3}) as item, index (item.name)}
 			<li>
 				<span class="text">{item.name}</span> 
@@ -43,6 +43,16 @@
 			</li>
 		{/each}
 	</ul> -->
+	<table>
+		<tbody class="wrapper-id-2">
+			{#each draggable(list3, ".wrapper-id-2", () => {list3 = list3}) as item, index (item.name)}
+				<tr>
+					<td class="text">{item.name}</td> 
+					<td style="display: block;" class="grab2" data-grabbable="true"></td>
+				</tr>
+			{/each}
+		</tbody>
+	</table>
 </div>
 
 <script lang="ts">
@@ -126,6 +136,9 @@
 		overflow: hidden;
 		height: fit-content;
 	}
+	table {
+		height: fit-content;
+	}
 	.text {
 		padding: 0.4em 0.8em;
 	}
@@ -134,6 +147,11 @@
 		width: 30px;
 		height: 100%;
 		display: block;
+	}
+	.grab2 {
+		background: rgb(206, 210, 212);
+		width: 30px;
+		height: 30px;
 	}
 	.bold {
 		font-weight: bold;

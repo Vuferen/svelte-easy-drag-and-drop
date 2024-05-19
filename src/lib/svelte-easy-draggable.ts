@@ -8,13 +8,15 @@ type SvelteListMapValue = Array<{list: Array<any>, update: Function}>;
 type SvelteListMap = Map<string, SvelteListMapValue>;
 
 let isMounted = new Promise(() => {});
+let mounted = false;
 let droppableLists: ListMap = new Map(); // map list elements to drag targets
 let svelteLists: SvelteListMap = new Map();
 let updateFuncListMap: Map<string, number> = new Map();
 let mouse = {x: 0, y: 0};
 
 export function draggable(list: Array<any>, wrapperQuery: string, onUpdate: Function, reverseOrder = false) {
-	if (typeof document !== 'undefined') {
+	if (typeof document !== 'undefined' && !mounted) {
+		mounted = true;
 		isMounted = Promise.resolve(true);
 		document.addEventListener("dragover", (e) => {
 			mouse.x = e.clientX;
@@ -27,6 +29,7 @@ export function draggable(list: Array<any>, wrapperQuery: string, onUpdate: Func
 	});
 	// Initial load
 	onMount(() => {
+		mounted = true;
 		isMounted = Promise.resolve(true);
 		list = handleDraggable(list, wrapperQuery, onUpdate, reverseOrder)
 		document.addEventListener("dragover", (e) => {
