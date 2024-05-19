@@ -4,6 +4,9 @@ This library provides a single function to make your existing lists draggable.
 
 ## Usage
 Wrap your list/array with the `draggable()` function, and provide a query string to target the wrapper as well as a function to make Svelte update the list:
+```js
+import { draggable } from "@vuferen/svelte-easy-drag-and-drop";
+```
 ```svelte
 <ul class="wrapper-id">
   {#each draggable(list, ".wrapper-id", () => {list = list}) as item (item.id)}
