@@ -3,6 +3,17 @@
 <p>Visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to read the documentation</p>
 
 <button on:click={() => newItem()}>Add</button>
+<button on:click={() => bold = !bold}>Toggle bold</button>
+{#if bold}
+<ul class="wrapper-id bold">
+	{#each draggable(list, ".wrapper-id", () => {list = list}) as item, index (item.name)}
+		<li>
+			<span class="text">{item.name}</span>
+			<span class="grab" data-grabbable="true"></span>
+		</li>
+	{/each}
+</ul>
+{:else}
 <ul class="wrapper-id">
 	{#each draggable(list, ".wrapper-id", () => {list = list}) as item, index (item.name)}
 		<li>
@@ -11,6 +22,7 @@
 		</li>
 	{/each}
 </ul>
+{/if}
 
 <!-- <button on:click={() => {list2 = [...list2, {name: "test2"}]}}>Add</button> -->
 <ul class="wrapper-id">
@@ -22,9 +34,18 @@
 	{/each}
 </ul>
 
+<ul class="wrapper-id-2">
+	{#each draggable(list3, ".wrapper-id-2", () => {list3 = list3}) as item, index (item.name)}
+		<li>
+			<span class="text">{item.name}</span> 
+			<span class="grab" data-grabbable="true"></span>
+		</li>
+	{/each}
+</ul>
+
 <script lang="ts">
 	import {draggable} from "$lib/svelte-easy-draggable.ts"
-
+	let bold = false;
 	let list = [{
 		name: "Lorem",
 	},
@@ -52,10 +73,29 @@
 		name: "Bar2",
 	}]
 	$: console.log("svelte", list2)
+
+	let list3 = [{
+		name: "Lorem3",
+	},
+	{
+		name: "Ipsum3",
+	},
+	{
+		name: "Foo3",
+	}, 
+	{
+		name: "Bar3",
+	}]
+	$: console.log("svelte", list3)
+
 	let uniqueId = 0;
 	function newItem() {
 		list  = [...list , {name: "test" + uniqueId++}]
 		console.log(list)
+	}
+
+	function updateList(updateList) {
+		updateList = updateList;
 	}
 
 </script>
@@ -85,5 +125,8 @@
 		width: 30px;
 		height: 100%;
 		display: block;
+	}
+	.bold {
+		font-weight: bold;
 	}
 </style>

@@ -4,18 +4,16 @@ type ElementMapValue = {element: HTMLElement, id: number, listId: number};
 type ElementMap = Map<HTMLElement, ElementMapValue>;
 type ListMapValue = {map: ElementMap};
 type ListMap = Map<string, ListMapValue>;
-type SvelteListMap = Map<string, Array<{list: Array<any>, update: Function}>>;
+type SvelteListMapValue = Array<{list: Array<any>, update: Function}>;
+type SvelteListMap = Map<string, SvelteListMapValue>;
 
 let isMounted = new Promise(() => {});
-let draggableLists: ListMap = new Map(); // map drag targets to elements
 let droppableLists: ListMap = new Map(); // map list elements to drag targets
 let svelteLists: SvelteListMap = new Map();
+let updateFuncListMap: Map<string, number> = new Map();
 let mouse = {x: 0, y: 0};
 
 export function draggable(list: Array<any>, wrapperQuery: string, onUpdate: Function) {
-	// Handle reactivity
-	// list.splice(0,1)
-	// list = list;
 	isMounted.then(() => {
 		list = handleDraggable(list, wrapperQuery, onUpdate)
 	});
@@ -34,27 +32,19 @@ export function draggable(list: Array<any>, wrapperQuery: string, onUpdate: Func
 function handleDraggable(list: Array<any>, wrapperQuery: string, onUpdate: Function) {
 	if (svelteLists.get(wrapperQuery) == undefined) {
 		svelteLists.set(wrapperQuery, [{list: list, update: onUpdate}]);
-	} else {
+		updateFuncListMap.set(onUpdate.name, 0);
+	} else if (updateFuncListMap.get(onUpdate.name) != undefined) {
+		let svelteList = <SvelteListMapValue>svelteLists.get(wrapperQuery);
+		svelteList[<number>updateFuncListMap.get(onUpdate.name)].list = list
+		svelteList[<number>updateFuncListMap.get(onUpdate.name)].update = onUpdate
+		svelteLists.set(wrapperQuery, svelteList);
+	}
+	else {
+		updateFuncListMap.set(onUpdate.name, (<SvelteListMapValue>svelteLists.get(wrapperQuery)).length);
 		svelteLists.get(wrapperQuery)?.push({list: list, update: onUpdate});
 	}
 	
 	let dragLists = document.querySelectorAll(wrapperQuery);
-	
-	// if (draggableLists.get(wrapperQuery) != undefined) {
-	// 	dragLists.forEach((dragList) => {
-	// 		let listElements: HTMLElement[] = [];
-	// 		if (dragList instanceof HTMLElement) {
-	// 			listElements = [...listElements, ...getChildren(dragList)]
-	// 		}
-	// 		listElements.forEach((e) => {
-	// 			if (!e.getAttribute("data-tracked-by-easy-draggable")) {
-	// 				e.setAttribute("data-tracked-by-easy-draggable", "true")
-	// 			}
-	// 		});
-	// 	});
-	// 	return list
-	// };
-
 	let dragTargets: ElementMap = new Map();
 	let dropTargets: ElementMap = new Map();
 	let currentListIndex = 0;
@@ -67,18 +57,17 @@ function handleDraggable(list: Array<any>, wrapperQuery: string, onUpdate: Funct
 		let currentIndex = 0;
 		listElements.forEach((e) => {
 			if (!e.getAttribute("data-tracked-by-easy-draggable")) {
-				e.setAttribute("data-tracked-by-easy-draggable", "true")
+				e.setAttribute("data-tracked-by-easy-draggable", wrapperQuery)
 				let newGrabbables = getGrabbables(e);
-				// dragTargets = new Map([...dragTargets, ...newGrabbables])
 				newGrabbables.forEach((value, key) => {
 					key.style.cursor = "grab"
 					key.style.userSelect = "none"
 					key.setAttribute("draggable", "true")
 					key.addEventListener("dragstart", (e) => {dragStart(e, value)});
 					key.addEventListener("dragend", (e) => {dragEnd(value); drop(e, list, wrapperQuery, currentIndex, onUpdate)});
-					value.addEventListener("dragover", (e) => {dragOver(e)})
+					value.addEventListener("dragover", (e) => {dragOver(e, wrapperQuery)})
 					value.addEventListener("drop", (e) => drop(e, list, wrapperQuery, currentIndex, onUpdate))
-					value.addEventListener("dragenter", (e) => dragEnter(e))
+					value.addEventListener("dragenter", (e) => dragEnter(e, wrapperQuery))
 					value.addEventListener("dragleave", (e) => dragLeave(e))
 					dragTargets.set(key, {element: value, id: currentIndex, listId: currentListIndex})
 					dropTargets.set(value, {element: key,  id: currentIndex, listId: currentListIndex})
@@ -88,13 +77,15 @@ function handleDraggable(list: Array<any>, wrapperQuery: string, onUpdate: Funct
 		})
 		currentListIndex++;
 	})
+	let filteredDroppableLists = new Map()
+	if (droppableLists.get(wrapperQuery) != undefined) {
+		filteredDroppableLists = new Map(
+			[...(<ListMapValue>droppableLists.get(wrapperQuery)).map]
+			.filter(([k, v]) => ![...dropTargets].some(([dk, dv]) => v.id == dv.id && v.listId == dv.listId))
+		);
+	}
 
-
-
-	draggableLists.set(wrapperQuery, {map: new Map([...draggableLists.get(wrapperQuery)?.map || new Map() , ...dragTargets])})
-	droppableLists.set(wrapperQuery, {map: new Map([...droppableLists.get(wrapperQuery)?.map || new Map() , ...dropTargets])})
-	console.log("dl",draggableLists)
-	console.log("dt", droppableLists)
+	droppableLists.set(wrapperQuery, {map: new Map([...filteredDroppableLists, ...dropTargets])})
 	return list;
 }
 
@@ -141,14 +132,15 @@ let draggingElementDisplay: string;
 let draggingElement: HTMLElement;
 let elementToPlace: HTMLElement;
 function dragStart(event: DragEvent, element: HTMLElement) {
-	if (currentlyDragging) return;
-	currentlyDragging = true;
+	// Have to use timeout because of chrome being chrome
 	if (event.dataTransfer) {
 		event.dataTransfer.setDragImage(new Image(), 0, 0)
+		event.dataTransfer.effectAllowed = "move";
 	}
-	togglePreventChildInterference(true);
-	// Have to use timeout because of chrome being chrome
 	setTimeout(() => {
+		if (currentlyDragging) return;
+		currentlyDragging = true;
+		togglePreventChildInterference(true);
 		// Hide element while dragging
 		draggingElementDisplay = element.style.display != "none" ? element.style.display : draggingElementDisplay; // Fix two grabbables on top of each other
 
@@ -173,7 +165,7 @@ function dragStart(event: DragEvent, element: HTMLElement) {
 			elementBeingDragged.style.top = (mouse.y - offsetY) + "px";
 		})
 		// element.style.display = "none";
-		element.style.opacity = "0";
+		element.style.opacity = "0.4";
 		document.body.after(draggingElement);
 		// toggleDraggable(false)
 	}, 0)
@@ -181,10 +173,10 @@ function dragStart(event: DragEvent, element: HTMLElement) {
 }
 
 function dragEnd(element: HTMLElement) {
-	currentlyDragging = false;
-	togglePreventChildInterference(false);
 	// Have to use timeout because of chrome being chrome
 	setTimeout(() => {
+	currentlyDragging = false;
+	togglePreventChildInterference(false);
 		draggingElement.remove();
 		// element.style.display = draggingElementDisplay
 		element.style.opacity = "1"
@@ -196,9 +188,15 @@ let isPlacedBeforeTarget: HTMLElement | null = null;
 let isPlacedAfterTarget: HTMLElement | null = null;
 let enteredFromAbove = false;
 let enteredFromBelow = false;
-function dragEnter(event: DragEvent) {
+function dragEnter(event: DragEvent, wrapperQuery: string) {
+	event.preventDefault()
+	if ((<HTMLElement>event.target).getAttribute("data-tracked-by-easy-draggable") !== elementToPlace.getAttribute("data-tracked-by-easy-draggable")) {
+		if (event.dataTransfer) {
+			event.dataTransfer.dropEffect = "none";
+		}
+		return
+	};
 	setTimeout(() => {
-		event.preventDefault()
 
 		let target = <HTMLElement>event.target
 		if (elementToPlace.contains(target)) return;
@@ -214,29 +212,61 @@ function dragEnter(event: DragEvent) {
 			enteredFromBelow = false;
 			enteredFromAbove = false;
 		}
-		updatePosition(target, lowerBound, upperBound);
+		updatePosition(target, lowerBound, upperBound, wrapperQuery, true);
 	}, 0)
 }
 
-function dragOver(event: DragEvent) {
+function dragOver(event: DragEvent, wrapperQuery: string) {
+	event.preventDefault()
+	if ((<HTMLElement>event.target).getAttribute("data-tracked-by-easy-draggable") !== elementToPlace.getAttribute("data-tracked-by-easy-draggable")) {
+		if (event.dataTransfer) {
+			event.dataTransfer.dropEffect = "none";
+		}
+		return
+	};
 	setTimeout(() => {
-		event.preventDefault()
 
 		let target = <HTMLElement>event.target;
 		if (elementToPlace.contains(target)) return;
 
 		const targetRect = target.getBoundingClientRect();
-		//const elementMidpoint = targetRect.top + (targetRect.bottom - targetRect.top) / 2;
 		const lowerBound = targetRect.top + (targetRect.bottom - targetRect.top) * 0.8;
 		const upperBound = targetRect.top + (targetRect.bottom - targetRect.top) * 0.2;
-		updatePosition(target, lowerBound, upperBound);
+		updatePosition(target, lowerBound, upperBound, wrapperQuery, false);
 	}, 0)
 }
 
-function updatePosition(target: HTMLElement, lowerBound: number, upperBound: number) {
+let extraUpdatesAfterEntering = 0;
+function updatePosition(target: HTMLElement, lowerBound: number, upperBound: number, wrapperQuery: string, isEntering: boolean) {
 	const isNotPlaced = isPlacedBeforeTarget == null && isPlacedAfterTarget == null;
-	const shouldPlaceBefore = (enteredFromAbove && mouse.y < upperBound && !isNotPlaced) || (enteredFromBelow && mouse.y < lowerBound);
-	const shouldPlaceAfter = (enteredFromAbove && mouse.y > upperBound) || ((enteredFromBelow) && mouse.y > lowerBound && !isNotPlaced);
+
+	let isPlacedSomewhereAfterTarget = false;
+	let isPlacedSomewhereBeforeTarget = false;
+	if (isEntering || extraUpdatesAfterEntering > 0) {
+		let element = <HTMLElement>(isPlacedBeforeTarget || isPlacedAfterTarget || elementToPlace);
+		let dropTarget = droppableLists.get(wrapperQuery)?.map.get(element);
+		let newDropTarget = droppableLists.get(wrapperQuery)?.map.get(target);
+		if (extraUpdatesAfterEntering > 0) {
+			extraUpdatesAfterEntering--;
+		}
+		if (dropTarget != undefined && newDropTarget != undefined) {
+			if (dropTarget.listId == newDropTarget.listId) {
+				isPlacedSomewhereAfterTarget = dropTarget.id > newDropTarget.id || (isPlacedAfterTarget != null && isPlacedAfterTarget.isSameNode(target));
+				isPlacedSomewhereBeforeTarget = dropTarget.id < newDropTarget.id || (isPlacedBeforeTarget != null && isPlacedBeforeTarget.isSameNode(target));
+			} else {
+				isPlacedSomewhereAfterTarget = true;
+				extraUpdatesAfterEntering = 2; // 2 updates are required after entering a new list to stabilize the position
+			}
+		}
+	}
+
+	const shouldPlaceBefore = (enteredFromAbove && mouse.y < upperBound && !isNotPlaced) || 
+							  (enteredFromBelow && mouse.y < lowerBound) || 
+							  (!enteredFromAbove && !enteredFromBelow && isPlacedSomewhereAfterTarget);
+	const shouldPlaceAfter = (enteredFromAbove && mouse.y > upperBound) || 
+							 ((enteredFromBelow) && mouse.y > lowerBound && !isNotPlaced) || 
+							 (!enteredFromAbove && !enteredFromBelow && isPlacedSomewhereBeforeTarget);
+
 	if (shouldPlaceBefore && !isPlacedBeforeTarget?.isSameNode(target)) {
 		removeElement()
 		target.before(elementToPlace);
@@ -269,25 +299,18 @@ function dragLeave(event: DragEvent) {
 	}, 0)
 }
 
-function toggleDraggable(on: boolean) {
-	draggableLists.forEach((list) => {
-		list.map.forEach((value) => {
-			value.element.setAttribute("draggable", on ? "true" : "false")
-		})
-	})
-}
-
 function drop(event: DragEvent, list: Array<any>, wrapperQuery: string, index: number, onUpdate: Function) {
 	event.preventDefault()
 	let element = <HTMLElement>(isPlacedBeforeTarget || isPlacedAfterTarget);
 	let shouldPlaceBeforeTarget = isPlacedBeforeTarget != null;
 	let dropTarget = droppableLists.get(wrapperQuery)?.map.get(element);
 	let newId = dropTarget?.id;
-	let oldValue = draggableLists.get(wrapperQuery)?.map.get(<HTMLElement>event.target);
+	let oldValue = droppableLists.get(wrapperQuery)?.map.get(elementToPlace); //draggableLists.get(wrapperQuery)?.map.get(<HTMLElement>event.target);
 	let oldId = oldValue?.id;
 	let lists = svelteLists.get(wrapperQuery);
 	
 	if (oldValue && newId != undefined && oldId != undefined && dropTarget != undefined && lists != undefined) {
+		oldValue.element = elementToPlace;
 		let oldList = lists[oldValue.listId];
 		let newList = lists[dropTarget.listId];
 
@@ -298,27 +321,21 @@ function drop(event: DragEvent, list: Array<any>, wrapperQuery: string, index: n
 			newId = newId > oldId ? newId - 1  : newId;
 		}
 		newId = shouldPlaceBeforeTarget ? newId : newId + 1;
-		console.log(newId, oldId)
-		console.log(oldValue.listId, dropTarget.listId)
-		updateIds(draggableLists, wrapperQuery, oldId, newId, oldValue.listId, dropTarget.listId);
 		updateIds(droppableLists, wrapperQuery, oldId, newId, oldValue.listId, dropTarget.listId);
 		if (oldValue.listId == dropTarget.listId) {
-			draggableLists.get(wrapperQuery)?.map.set(<HTMLElement>event.target, {element: oldValue.element, id: newId, listId: dropTarget.listId})
 			droppableLists.get(wrapperQuery)?.map.set(<HTMLElement>oldValue.element, {element: <HTMLElement>event.target, id: newId, listId: dropTarget.listId})
 		} else {
-			draggableLists.get(wrapperQuery)?.map.delete(<HTMLElement>event.target);
 			droppableLists.get(wrapperQuery)?.map.delete(<HTMLElement>oldValue.element);
 		}
 		newList.list.splice(newId, 0, moveData) // insert element in new position
-
+		
 		oldList.list = oldList.list;
 		newList.list = newList.list;
 		oldList.update();
 		newList.update();
-		//console.log(droppableLists);
-		//element.setAttribute("data-tracked-by-easy-draggable", "true");
+		isPlacedBeforeTarget = null;
+		isPlacedAfterTarget = null;
 	}
-	// console.log(newId)
 }
 
 function updateIds(lists: ListMap, wrapperQuery: string, deleteId: number, insertId: number, deleteListId: number, insertListId: number) {
@@ -339,7 +356,7 @@ function togglePreventChildInterference(shouldPrevent: Boolean) {
 	let preventStyle = document.getElementById("svelteEasyDraggablePreventChildInterference");
 	if (shouldPrevent && preventStyle == null) {
 		const style = `
-			[data-tracked-by-easy-draggable="true"] * {
+			[data-tracked-by-easy-draggable] * {
 				pointer-events: none;
 			}
 		`;
