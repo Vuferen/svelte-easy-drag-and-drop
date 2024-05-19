@@ -138,7 +138,6 @@ let currentlyDragging = false;
 let draggingElementDisplay: string;
 let draggingElement: HTMLElement;
 let elementToPlace: HTMLElement;
-// let elementOriginalOpacity = "1"
 function dragStart(event: DragEvent, element: HTMLElement) {
 	// Have to use timeout because of chrome being chrome
 	if (event.dataTransfer) {
@@ -165,7 +164,6 @@ function dragStart(event: DragEvent, element: HTMLElement) {
 		mouse.y = event.clientY;
 		draggingElement.style.left = element.getBoundingClientRect().x + "px";
 		draggingElement.style.top = element.getBoundingClientRect().y + "px";
-		// draggingElement.style.opacity = svelteEasyDraggableConfig.draggingElementOpacity.toString();
 
 		element.addEventListener("drag", (e: DragEvent) => {
 			let elementBeingDragged = document.getElementById("element-being-dragged");
@@ -173,8 +171,6 @@ function dragStart(event: DragEvent, element: HTMLElement) {
 			elementBeingDragged.style.left = (mouse.x - offsetX) + "px";
 			elementBeingDragged.style.top = (mouse.y - offsetY) + "px";
 		})
-		// elementOriginalOpacity = element.style.opacity;
-		// element.style.opacity = svelteEasyDraggableConfig.previewElementOpacity.toString();
 		element.setAttribute("data-preview-element", "true")
 		draggingElement.setAttribute("data-dragging-element", "true")
 		document.body.after(draggingElement);
@@ -188,10 +184,7 @@ function dragEnd(element: HTMLElement) {
 	currentlyDragging = false;
 	togglePreventChildInterference(false);
 		draggingElement.remove();
-		// element.style.display = draggingElementDisplay
-		// element.style.opacity = elementOriginalOpacity
 		element.removeAttribute("data-preview-element")
-		// toggleDraggable(true)
 	}, 0)
 }
 
@@ -304,13 +297,11 @@ function updatePosition(target: HTMLElement, lowerBound: number, upperBound: num
 		target.before(elementToPlace);
 		isPlacedBeforeTarget = target;
 		isPlacedAfterTarget = null;
-		showElement()
 	} else if (shouldPlaceAfter && !isPlacedAfterTarget?.isSameNode(target)) {
 		removeElement()
 		target.after(elementToPlace);
 		isPlacedBeforeTarget = null;
 		isPlacedAfterTarget = target;
-		showElement()
 	}
 }
 function updatePositionAsChild(target: HTMLElement) {
@@ -336,20 +327,12 @@ function updatePositionAsChild(target: HTMLElement) {
 function previewAsChild(target: HTMLElement) {
 	removeElement()
 	target.appendChild(elementToPlace);
-	showElement()
 	isPlacedBeforeTarget = null;
 	isPlacedAfterTarget = null;
 }
 
 function removeElement() {
 	elementToPlace.remove()
-	// draggingElement.style.opacity = svelteEasyDraggableConfig.draggingElementOpacity.toString()
-	// elementToPlace.style.opacity = svelteEasyDraggableConfig.previewElementOpacity.toString()
-}
-
-function showElement() {
-	// draggingElement.style.opacity = svelteEasyDraggableConfig.draggingElementOpacity.toString()
-	// elementToPlace.style.opacity = svelteEasyDraggableConfig.previewElementOpacity.toString()
 }
 
 function dragLeave(event: DragEvent) {
@@ -364,7 +347,7 @@ function drop(event: DragEvent, list: Array<any>, wrapperQuery: string, index: n
 	let shouldPlaceBeforeTarget = isPlacedBeforeTarget != null;
 	let dropTarget = droppableLists.get(wrapperQuery)?.map.get(element);
 	let newId = dropTarget?.id;
-	let oldValue = droppableLists.get(wrapperQuery)?.map.get(elementToPlace); //draggableLists.get(wrapperQuery)?.map.get(<HTMLElement>event.target);
+	let oldValue = droppableLists.get(wrapperQuery)?.map.get(elementToPlace);
 	let oldId = oldValue?.id;
 	let lists = svelteLists.get(wrapperQuery);
 	

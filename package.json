@@ -1,5 +1,5 @@
 {
-	"name": "svelte-grab-and-drag",
+	"name": "@vuferen/svelte-easy-drag-and-drop",
 	"version": "0.0.1",
 	"scripts": {
 		"dev": "vite dev",
@@ -35,7 +35,7 @@
 		"typescript": "^5.0.0",
 		"vite": "^4.4.2"
 	},
+	"type": "module",
 	"svelte": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"type": "module"
+	"license": "MIT"
 }

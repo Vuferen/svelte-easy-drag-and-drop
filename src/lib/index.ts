@@ -1,1 +1,2 @@
-// Reexport your entry components here
+import { draggable } from "./svelte-easy-draggable.ts";
+export default draggable;
